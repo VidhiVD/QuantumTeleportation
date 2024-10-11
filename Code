@@ -1,0 +1,82 @@
+import numpy as np
+from numpy import pi
+from scipy.linalg import expm
+import matplotlib.pyplot as plt
+
+# Define basic quantum states
+zero = np.array([[1], [0]])  # |0>
+one = np.array([[0], [1]])   # |1>
+
+# Quantum gates
+I = np.eye(2)  # Identity matrix
+X = np.array([[0, 1], [1, 0]])  # Pauli-X (NOT gate)
+Z = np.array([[1, 0], [0, -1]])  # Pauli-Z gate
+H = np.array([[1, 1], [1, -1]]) / np.sqrt(2)  # Hadamard gate
+
+# Function for tensor product
+def tensor(*args):
+    result = np.array([[1]])
+    for matrix in args:
+        result = np.kron(result, matrix)
+    return result
+
+# Entangle B and C (EPR pair)
+def entangle_BC():
+    psi_B = zero  # Start with qubit B in |0>
+    psi_C = zero  # Start with qubit C in |0>
+    # Apply Hadamard to B and CNOT between B and C
+    state = tensor(H, I) @ tensor(psi_B, psi_C)
+    return state
+
+# Introduce an electromagnetic disturbance (phase shift)
+def apply_em_field(state, strength):
+    # Apply a Z-gate (phase shift) to simulate electromagnetic interference
+    Z_em = np.array([[1, 0], [0, np.exp(1j * strength)]])
+    return tensor(I, Z_em) @ state
+
+# Measurement simulation - collapses qubit states
+def measure(state):
+    probabilities = np.abs(state)**2
+    result = np.random.choice([0, 1], p=probabilities.flatten())
+    return result
+
+# Apply teleportation steps
+def teleport(psi_A, psi_BC):
+    # Assume psi_A is a superposition of |0> and |1>
+    combined_state = tensor(psi_A, psi_BC)
+    # Measurement step collapses the entanglement
+    measure_result = measure(combined_state)
+    return measure_result
+
+# Visualize results
+def plot_fidelity(fidelity_list, em_strength_list):
+    plt.plot(em_strength_list, fidelity_list)
+    plt.xlabel('Electromagnetic Field Strength')
+    plt.ylabel('Teleportation Fidelity')
+    plt.title('Effect of EM Field on Teleportation Fidelity')
+    plt.show()
+
+# Simulation process
+def simulate_teleportation():
+    em_strength_list = np.linspace(0, 2*pi, 100)  # Varying electromagnetic field strength
+    fidelity_list = []
+    
+    for em_strength in em_strength_list:
+        # Step 1: Entangle B and C
+        entangled_BC = entangle_BC()
+
+        # Step 2: Apply electromagnetic disturbance
+        disturbed_BC = apply_em_field(entangled_BC, em_strength)
+
+        # Step 3: Perform teleportation (scan A, measure B/C)
+        psi_A = H @ zero  # Assume A is in a superposition state
+        teleport_result = teleport(psi_A, disturbed_BC)
+
+        # Measure fidelity (teleport success if B/C system recovers A's state)
+        fidelity = 1 - np.abs(teleport_result - np.abs(psi_A))**2
+        fidelity_list.append(fidelity)
+
+    plot_fidelity(fidelity_list, em_strength_list)
+
+# Run the simulation
+simulate_teleportation()
