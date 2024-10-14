@@ -3,6 +3,10 @@ from numpy import pi
 from scipy.linalg import expm
 import matplotlib.pyplot as plt
 
+#Hello! This is my totally not-at all busted python code for a quantum teleportation project 
+
+print = ("Hello! This is my totally not-at all busted python code for a quantum teleportation project ")
+print = ("Go to this URL if you would like to see some of the physics behind it: https://docs.google.com/document/d/17C-sPici6mHOF4rhNXf8qonqWP9yS_iZAtiwvDT_2Hw/edit?usp=sharing")
 # Define basic quantum states
 zero = np.array([[1], [0]])  # |0>
 one = np.array([[0], [1]])   # |1>
