@@ -1,0 +1,134 @@
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include "qsim.h"
+#include "qsim_circuit.h"
+
+using namespace qsim;
+
+// Function to add entanglement (EPR pair)
+void AddEntanglement(Circuit<GateQSim<float>>& circuit, unsigned qubit1, unsigned qubit2) {
+    circuit.gates.push_back({0, {H, qubit1}});           // Hadamard gate on qubit1
+    circuit.gates.push_back({0, {CNOT, qubit1, qubit2}}); // CNOT between qubit1 and qubit2
+}
+
+// Function to add measurement gates
+void AddMeasurement(Circuit<GateQSim<float>>& circuit, unsigned qubit, unsigned classical_bit) {
+    circuit.gates.push_back({0, {MEASURE, qubit, classical_bit}}); // Measure the qubit
+}
+
+// Function to apply conditional corrections based on measurements
+void ApplyConditionalCorrections(Circuit<GateQSim<float>>& circuit,
+                                  unsigned target_qubit,
+                                  unsigned control_classical_bit1,
+                                  unsigned control_classical_bit2) {
+    circuit.gates.push_back({control_classical_bit1, {X, target_qubit}}); // Conditional X gate
+    circuit.gates.push_back({control_classical_bit2, {Z, target_qubit}}); // Conditional Z gate
+}
+
+// Function to introduce decoherence effects (e.g., depolarizing noise)
+void AddDecoherence(Circuit<GateQSim<float>>& circuit, unsigned qubit, float probability) {
+    circuit.gates.push_back({0, {DEPOLARIZE, qubit, probability}}); // Depolarizing noise
+}
+
+// Function to apply basic error correction (Shor code for single qubit example)
+void ApplyErrorCorrection(Circuit<GateQSim<float>>& circuit, unsigned qubit) {
+    unsigned ancilla1 = qubit + 1;
+    unsigned ancilla2 = qubit + 2;
+
+    // Encode the logical qubit
+    circuit.gates.push_back({0, {CNOT, qubit, ancilla1}});
+    circuit.gates.push_back({0, {CNOT, qubit, ancilla2}});
+
+    // Introduce noise
+    AddDecoherence(circuit, qubit, 0.01);
+    AddDecoherence(circuit, ancilla1, 0.01);
+    AddDecoherence(circuit, ancilla2, 0.01);
+
+    // Error correction
+    circuit.gates.push_back({0, {CNOT, ancilla1, qubit}});
+    circuit.gates.push_back({0, {CNOT, ancilla2, qubit}});
+    AddMeasurement(circuit, ancilla1, 0); // Detect error on ancilla1
+    AddMeasurement(circuit, ancilla2, 1); // Detect error on ancilla2
+}
+
+// Function to prepare custom initial states
+void PrepareCustomState(Circuit<GateQSim<float>>& circuit, unsigned qubit, const std::vector<float>& amplitudes) {
+    if (amplitudes.size() != 2 || std::abs(amplitudes[0] * amplitudes[0] + amplitudes[1] * amplitudes[1] - 1.0) > 1e-6) {
+        std::cerr << "Error: Invalid state vector. Ensure it is normalized." << std::endl;
+        return;
+    }
+    // Apply rotation gates to prepare the desired state
+    float theta = 2 * std::acos(amplitudes[0]);
+    circuit.gates.push_back({0, {RX, qubit, theta}});
+}
+
+// Function to scale the system up or down
+void ScaleSystem(unsigned num_particles, unsigned qubits_per_particle, Circuit<GateQSim<float>>& circuit) {
+    const unsigned total_qubits = num_particles * qubits_per_particle;
+
+    // Initialize the quantum system
+    circuit.num_qubits = total_qubits;
+
+    // Prepare entangled pairs for teleportation
+    for (unsigned i = 0; i < num_particles - 1; ++i) {
+        unsigned particle_a = i * qubits_per_particle;
+        unsigned particle_b = (i + 1) * qubits_per_particle;
+
+        AddEntanglement(circuit, particle_a, particle_b); // Entangle qubits across particles
+    }
+}
+
+// Visualization function to display the circuit structure
+void VisualizeCircuit(const Circuit<GateQSim<float>>& circuit) {
+    std::cout << "Quantum Circuit:" << std::endl;
+    for (const auto& gate : circuit.gates) {
+        std::cout << "Gate: " << gate.gate_family << " on qubits ";
+        for (unsigned q : gate.qubits) {
+            std::cout << q << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+
+int main() {
+    // Parameters for scaling
+    const unsigned num_particles = 3;        // Number of particles
+    const unsigned qubits_per_particle = 2;  // Qubits per particle
+    const float decoherence_prob = 0.01;     // Probability of decoherence
+
+    // Initialize circuit
+    Circuit<GateQSim<float>> circuit;
+
+    // Scale the system
+    ScaleSystem(num_particles, qubits_per_particle, circuit);
+
+    // Prepare custom initial state for particle A (qubit 0)
+    PrepareCustomState(circuit, 0, {0.8f, 0.6f}); // Example: custom state |ψ⟩ = 0.8|0⟩ + 0.6|1⟩
+
+    // Add entanglement between B and C
+    unsigned particle_b = qubits_per_particle;
+    unsigned particle_c = 2 * qubits_per_particle;
+    AddEntanglement(circuit, particle_b, particle_c);
+
+    // Add decoherence
+    for (unsigned i = 0; i < num_particles * qubits_per_particle; ++i) {
+        AddDecoherence(circuit, i, decoherence_prob);
+    }
+
+    // Apply error correction to particle A
+    ApplyErrorCorrection(circuit, 0);
+
+    // Visualize the circuit
+    VisualizeCircuit(circuit);
+
+    // Simulate the circuit
+    NoisyCircuitRunner<float> simulator;
+    auto state = simulator.Run(circuit, circuit.num_qubits);
+
+    // Output final state of particle C
+    std::cout << "Simulation Complete. State of particle C:" << std::endl;
+    std::cout << "Qubit 4: " << state[particle_c] << ", Qubit 5: " << state[particle_c + 1] << std::endl;
+
+    return 0;
+}

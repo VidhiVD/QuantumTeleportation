@@ -1,83 +1,71 @@
+import cirq
+import qsimcirq
 import numpy as np
+import matplotlib.pyplot as plt
 
-#Hello! This is my totally not-at all busted python code for a quantum teleportation project 
+# Define qubits
+qA, qB, qC = cirq.LineQubit.range(3)
 
-print = ("Hello! This is my totally not-at all busted python code for a quantum teleportation project ")
-print = ("Go to this URL if you would like to see some of the physics behind it: https://docs.google.com/document/d/17C-sPici6mHOF4rhNXf8qonqWP9yS_iZAtiwvDT_2Hw/edit?usp=sharing")
-# Define basic quantum states
-zero = np.array([[1], [0]])  # |0>
-one = np.array([[0], [1]])   # |1>
+# Function to create entanglement between B and C (EPR pair)
+def create_entangled_pair(circuit, qB, qC):
+    circuit.append([cirq.H(qB), cirq.CNOT(qB, qC)])
 
-# Quantum gates
-I = np.eye(2)  # Identity matrix
-X = np.array([[0, 1], [1, 0]])  # Pauli-X (NOT gate)
-Z = np.array([[1, 0], [0, -1]])  # Pauli-Z gate
-H = np.array([[1, 1], [1, -1]]) / np.sqrt(2)  # Hadamard gate
+# Function to introduce a phase shift on qubit (simulating EM disturbance)
+def apply_em_disturbance(circuit, qubit, phase_shift):
+    circuit.append(cirq.Z(qubit)**(phase_shift / np.pi))  # Z rotation based on phase_shift
 
-# Function for tensor product
-def tensor(*args):
-    result = np.array([[1]])
-    for matrix in args:
-        result = np.kron(result, matrix)
-    return result
+# Teleportation circuit
+def teleport_circuit(phase_shift):
+    circuit = cirq.Circuit()
+    
+    # Step 1: Prepare initial state of qubit A (superposition)
+    circuit.append(cirq.H(qA))  # Place A in a superposition
+    
+    # Step 2: Create entanglement between B and C
+    create_entangled_pair(circuit, qB, qC)
+    
+    # Step 3: Introduce EM disturbance (phase shift) on qubit C
+    apply_em_disturbance(circuit, qC, phase_shift)
+    
+    # Step 4: Perform Bell measurement on A and B
+    circuit.append([cirq.CNOT(qA, qB), cirq.H(qA)])
+    circuit.append([cirq.measure(qA), cirq.measure(qB)])
+    
+    # Step 5: Apply conditional operations based on measurement results
+    circuit.append(cirq.CNOT(qB, qC))
+    circuit.append(cirq.CZ(qA, qC))
+    
+    return circuit
 
-# Entangle B and C (EPR pair)
-def entangle_BC():
-    psi_B = zero  # Start with qubit B in |0>
-    psi_C = zero  # Start with qubit C in |0>
-    # Apply Hadamard to B and CNOT between B and C
-    state = tensor(H, I) @ tensor(psi_B, psi_C)
-    return state
+# Function to calculate fidelity
+def calculate_fidelity(result, phase_shift):
+    fidelity = np.cos(phase_shift / 2)**2  # Expected fidelity decreases with phase shift
+    return fidelity
 
-# Introduce an electromagnetic disturbance (phase shift)
-def apply_em_field(state, strength):
-    # Apply a Z-gate (phase shift) to simulate electromagnetic interference
-    Z_em = np.array([[1, 0], [0, np.exp(1j * strength)]])
-    return tensor(I, Z_em) @ state
-
-# Measurement simulation - collapses qubit states
-def measure(state):
-    probabilities = np.abs(state)**2
-    result = np.random.choice([0, 1], p=probabilities.flatten())
-    return result
-
-# Apply teleportation steps
-def teleport(psi_A, psi_BC):
-    # Assume psi_A is a superposition of |0> and |1>
-    combined_state = tensor(psi_A, psi_BC)
-    # Measurement step collapses the entanglement
-    measure_result = measure(combined_state)
-    return measure_result
-
-# Visualize results
-def plot_fidelity(fidelity_list, em_strength_list):
-    plt.plot(em_strength_list, fidelity_list)
-    plt.xlabel('Electromagnetic Field Strength')
-    plt.ylabel('Teleportation Fidelity')
-    plt.title('Effect of EM Field on Teleportation Fidelity')
+# Run the simulation with varying EM phase shift values
+def run_simulation():
+    sim = qsimcirq.QSimSimulator()
+    phase_shifts = np.linspace(0, np.pi, 50)  # Phase shift from 0 to π
+    fidelities = []
+    
+    for phase_shift in phase_shifts:
+        # Generate the circuit with current phase shift
+        circuit = teleport_circuit(phase_shift)
+        
+        # Run simulation
+        result = sim.run(circuit, repetitions=100)
+        
+        # Calculate fidelity and record
+        fidelity = calculate_fidelity(result, phase_shift)
+        fidelities.append(fidelity)
+    
+    # Plot fidelity vs phase shift
+    plt.plot(phase_shifts, fidelities, label="Fidelity")
+    plt.xlabel("Electromagnetic Phase Shift (radians)")
+    plt.ylabel("Teleportation Fidelity")
+    plt.title("Effect of Electromagnetic Disturbance on Quantum Teleportation")
+    plt.legend()
     plt.show()
 
-# Simulation process
-def simulate_teleportation():
-    em_strength_list = np.linspace(0, 2*pi, 100)  # Varying electromagnetic field strength
-    fidelity_list = []
-    
-    for em_strength in em_strength_list:
-        # Step 1: Entangle B and C
-        entangled_BC = entangle_BC()
-
-        # Step 2: Apply electromagnetic disturbance
-        disturbed_BC = apply_em_field(entangled_BC, em_strength)
-
-        # Step 3: Perform teleportation (scan A, measure B/C)
-        psi_A = H @ zero  # Assume A is in a superposition state
-        teleport_result = teleport(psi_A, disturbed_BC)
-
-        # Measure fidelity (teleport success if B/C system recovers A's state)
-        fidelity = 1 - np.abs(teleport_result - np.abs(psi_A))**2
-        fidelity_list.append(fidelity)
-
-    plot_fidelity(fidelity_list, em_strength_list)
-
-# Run the simulation
-simulate_teleportation()
+# Execute simulation
+run_simulation()
