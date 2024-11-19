@@ -1,7 +1,4 @@
 import numpy as np
-from numpy import pi
-from scipy.linalg import expm
-import matplotlib.pyplot as plt
 
 #Hello! This is my totally not-at all busted python code for a quantum teleportation project 
 
